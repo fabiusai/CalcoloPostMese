@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analisi Post per Canale</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <!-- Papa Parse per il parsing del CSV -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f4;
+    }
+    header {
+      background-color: #004b8d;
+      color: #ffd700;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.8em;
+    }
+    .container {
+      margin-top: 20px;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    #options {
+      margin: 10px 0;
+    }
+    button {
+      background-color: #ffd700;
+      color: #004b8d;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1em;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #results table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    #results th, #results td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+    }
+    #results th {
+      background-color: #004b8d;
+      color: #ffd700;
+    }
+    #results p {
+      font-size: 1.1em;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Analisi Post per Canale</h1>
+  </header>
+  <div class="container">
+    <input type="file" id="fileInput" accept=".csv">
+    <div id="options" style="display:none;">
+      <label>
+        <input type="radio" name="method" value="ignore" checked>
+        Ignora righe di raggruppamento (tutto maiuscolo)
+      </label>
+      <label style="margin-left:20px;">
+        <input type="radio" name="method" value="only">
+        Considera solo righe di raggruppamento (tutto maiuscolo)
+      </label>
+    </div>
+    <button id="processBtn" disabled>Elabora</button>
+    <div id="results"></div>
+  </div>
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const processBtn = document.getElementById('processBtn');
+    const optionsDiv = document.getElementById('options');
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        optionsDiv.style.display = 'block';
+        processBtn.disabled = false;
+      } else {
+        optionsDiv.style.display = 'none';
+        processBtn.disabled = true;
+      }
+    });
+    processBtn.addEventListener('click', () => {
+      const file = fileInput.files[0];
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: ({ data }) => {
+          const metodo = document.querySelector('input[name="method"]:checked').value;
+          const filtered = data.filter(row => {
+            const arg = row['Argomento'] || '';
+            const isUpper = arg.trim() !== '' && /^[^a-z]*$/.test(arg);
+            return metodo === 'ignore' ? !isUpper : isUpper;
+          });
+          const totalPosts = filtered.reduce((sum, row) => sum + (parseInt(row['Totale']) || 0), 0);
+          const exclude = ['Argomento', 'Flag Istituzionale', 'Totale'];
+          const channelCols = Object.keys(data[0]).filter(c => !exclude.includes(c));
+          const sums = channelCols.reduce((acc, col) => ({ ...acc, [col]: 0 }), {});
+          filtered.forEach(row => {
+            channelCols.forEach(col => {
+              sums[col] += parseInt(row[col]) || 0;
+            });
+          });
+          let html = `<p>Numero totale di post: ${totalPosts}</p>`;
+          html += '<table><tr><th>Canale</th><th>Post</th></tr>';
+          channelCols.forEach(col => {
+            html += `<tr><td>${col}</td><td>${sums[col]}</td></tr>`;
+          });
+          html += '</table>';
+          document.getElementById('results').innerHTML = html;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
